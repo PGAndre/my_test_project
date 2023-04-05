@@ -1,0 +1,45 @@
+version: '3.9'
+
+services:
+  app:
+    image: my-test_api
+    container_name: my-test-api
+    build:
+      context: .
+    restart: always
+    command: >
+        sh -c "python cli.py migrate &&
+               python cli.py api --host 0.0.0.0 --port 7001"
+    env_file:
+      - .env
+    ports:
+      - "7002:7001"
+    depends_on:
+      - db
+      - redis
+
+
+
+  db:
+    image: postgres:13.2
+    command: ["postgres",]
+    environment:
+      PGDATA: /data/postgres
+#      POSTGRES_USER: postgres
+#      POSTGRES_PASSWORD: passw0rd
+#      POSTGRES_DB: my_project
+#      POSTGRES_HOST: db
+    env_file:
+      - .env
+    ports:
+      - "55432:5432"
+    restart: always
+
+
+  redis:
+    container_name: my-project-redis
+    image: redis:6.2-alpine
+    restart: always
+    ports:
+      - '6379:6379'
+    command: redis-server  --loglevel debug
