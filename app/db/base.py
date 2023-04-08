@@ -22,44 +22,40 @@ ModelType = TypeVar("ModelType", bound=Base)
 
 
 class Repository:
-    """Родительский класс для всех репозиториев."""
 
-    model: Type[ModelType]
-    domain_model: Type[AnyDomainModel]
+    def __init__(self, model: Type[ModelType], domain_model: Type[AnyDomainModel]):
+        self.model = model
+        self.domain_model = domain_model
 
-    @classmethod
-    def make_search_query(cls, **kwargs: Dict) -> Select:
-        q = select(cls.model)
+    def make_search_query(self, **kwargs: Dict) -> Select:
+        q = select(self.model)
         for key, value in kwargs.items():
             if isinstance(value, list):
-                q = q.where(getattr(cls.model, key).in_(value))
+                q = q.where(getattr(self.model, key).in_(value))
             else:
-                q = q.where(getattr(cls.model, key) == value)
+                q = q.where(getattr(self.model, key) == value)
         return q
 
-    @classmethod
     @maybe_session
-    async def create(cls, session: AsyncSession, **kwargs: Dict) -> AnyDomainModel:
-        instance = cls.model(**kwargs)
+    async def create(self, session: AsyncSession, **kwargs: Dict) -> AnyDomainModel:
+        instance = self.model(**kwargs)
         session.add(instance)
         await session.flush()
-        return cls.domain_model(**instance.__dict__)
+        return self.domain_model(**instance.__dict__)
 
-    @classmethod
     @maybe_session
-    async def read(cls, pk: str, value: Any, session: AsyncSession) -> AnyDomainModel:
+    async def read(self, pk: str, value: Any, session: AsyncSession) -> AnyDomainModel:
         """Может поднять sqlalchemy.exc.NoResultFound"""
 
-        query = select(cls.model).where(getattr(cls.model, pk) == value)
+        query = select(self.model).where(getattr(self.model, pk) == value)
         instance = await exactly_one(session, query)
-        return cls.domain_model(**instance.__dict__)
+        return self.domain_model(**instance.__dict__)
 
-    @classmethod
     @maybe_session
-    async def update(cls, pk: str, session: AsyncSession, **kwargs: Any) -> None:
+    async def update(self, pk: str, session: AsyncSession, **kwargs: Any) -> None:
         q = (
-            update(cls.model)
-            .where(getattr(cls.model, pk) == kwargs[pk])
+            update(self.model)
+            .where(getattr(self.model, pk) == kwargs[pk])
             .values(**kwargs)
         )
         result = await session.execute(q)
@@ -67,26 +63,23 @@ class Repository:
             result.rowcount == 1
         ), f"Rowcount is {result.rowcount} instead of 1. All changes are rolled back!"
 
-    @classmethod
     @maybe_session
-    async def delete(cls, pk: str, value: Any, session: AsyncSession) -> None:
+    async def delete(self, pk: str, value: Any, session: AsyncSession) -> None:
         """Может поднять sqlalchemy.exc.NoResultFound"""
 
-        query = delete(cls.model).where(getattr(cls.model, pk) == value)
+        query = delete(self.model).where(getattr(self.model, pk) == value)
         await session.execute(query)
         await session.commit()
 
-    @classmethod
     @maybe_session
-    async def read_many(cls, session: AsyncSession, **kwargs) -> List[ModelType]:
-        q = cls.make_search_query(**kwargs)
+    async def read_many(self, session: AsyncSession, **kwargs) -> List[ModelType]:
+        q = self.make_search_query(**kwargs)
         records = await get_list(session, q)
-        return [cls.domain_model(**x.__dict__) for x in records]
+        return [self.domain_model(**x.__dict__) for x in records]
 
-    @classmethod
     @maybe_session
     async def upsert(
-        cls,
+        self,
         data: Dict,
         pk: str,
         session: AsyncSession,
@@ -94,33 +87,31 @@ class Repository:
     ) -> AnyDomainModel:
 
         if not constraint:
-            constraint = f"uq_{cls.model.__table__.name}_{pk}"
+            constraint = f"uq_{self.model.__table__.name}_{pk}"
 
         statement = (
-            insert(cls.model)
+            insert(self.model)
             .values(**data)
             .on_conflict_do_update(constraint=constraint, set_=data)
         )
         await session.execute(statement)
 
-        item = await cls.read(pk=pk, value=data[pk], session=session)
+        item = await self.read(pk=pk, value=data[pk], session=session)
         return item
 
-    @classmethod
     @maybe_session
     async def multiple_update(
-        cls,
+        self,
         data: List[Dict],
         session: AsyncSession,
     ):
-        statement = update(cls.model)
+        statement = update(self.model)
         await session.execute(statement, data)
 
-    @classmethod
     @maybe_session
-    async def read_one(cls, session: AsyncSession, **kwargs) -> AnyDomainModel:
-        result = await exactly_one(session, cls.make_search_query(**kwargs))
-        return cls.domain_model(**result.__dict__)
+    async def read_one(self, session: AsyncSession, **kwargs) -> AnyDomainModel:
+        result = await exactly_one(session, self.make_search_query(**kwargs))
+        return self.domain_model(**result.__dict__)
 
 
 async def one_or_none(api_db: AsyncSession, query: Select) -> Optional[ModelType]:

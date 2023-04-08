@@ -11,21 +11,23 @@ from app.clients.external_api.dadata.clients.dadata import dadata_api
 from app.clients.external_api.dadata.schemas.response.dadata import (
     DadataCountryResponse,
 )
-from app.db.repositories.base import get_list
-from app.db.repositories.base import Repository
+from app.db.base import get_list
+from app.db.base import Repository
 from app.db.setup import in_transaction
 from app.db.setup import maybe_session
 from app.db.tables.users import User as UserTable
 from app.models.domain.user import UserDomain
 
 
-class UserRepo(Repository):
+class UserRepo:
+    #используем композицию для доступа к репозиторию DB
     model = UserTable
     domain_model = UserDomain
+    db_repo = Repository(model=model, domain_model=domain_model)
 
     @classmethod
     async def check_exists(cls, **fields: Dict[str, str]):
-        query = cls.make_search_query(**fields)
+        query = cls.db_repo.make_search_query(**fields)
 
         async with in_transaction() as db:
             users = await get_list(api_db=db, query=query)
@@ -38,9 +40,9 @@ class UserRepo(Repository):
             )
 
     @classmethod
-    async def get_user(self, pk: str, value: Any):
+    async def get_user(cls, pk: str, value: Any):
         try:
-            user: UserDomain = await UserRepo.read(pk=pk, value=value)
+            user: UserDomain = await cls.db_repo.read(pk=pk, value=value)
         except NoResultFound:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

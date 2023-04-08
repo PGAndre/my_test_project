@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 from fastapi import status
 
-from app.db.repositories.user import UserRepo
+from app.models.repositories.user import UserRepo
 from app.logic import user as logic_user
 from app.schemas.request.user import CreateUserRequestSchema
 from app.schemas.response.user import UserResponseSchema
@@ -57,4 +57,4 @@ async def get_user_request(
 async def delete_user_request(
     phone_number: str,
 ) -> None:
-    await UserRepo.delete(pk="phone_number", value=phone_number)
+    await UserRepo.db_repo.delete(pk="phone_number", value=phone_number)
